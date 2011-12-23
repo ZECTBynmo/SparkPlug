@@ -1,0 +1,1 @@
+SparkPlug is a demonstration of a simple multithreaded piece of audio software. It has a DSP and UI thread, and can be used to do any kind of audio processing on- and off-line
