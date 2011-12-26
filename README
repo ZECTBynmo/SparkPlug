@@ -1,4 +1,4 @@
-SparkPlug is a demonstration of a simple multithreaded piece of audio software. It has a DSP and UI thread, and can be used to do any kind of audio processing on- and off-line
+The sparkplug project is a demonstration of a simple multithreaded piece of audio software composed of two separate projects. It has a DSP and UI thread, and can be used to do any kind of audio processing on- and off-line
 
 Engine is a DSP processor. It runs on its own non-locking thread and allows for arbitrary audio processing (which will be developed later)
 
