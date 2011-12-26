@@ -30,9 +30,9 @@ QThread() {
 	
 	// Setup our audio device information
 	QAudioDeviceInfo info( QAudioDeviceInfo::defaultOutputDevice() );
-	QAudioDeviceInfo info(QAudioDeviceInfo::defaultOutputDevice());
+	//QAudioDeviceInfo info(QAudioDeviceInfo::defaultOutputDevice());
 	if (!info.isFormatSupported(m_format)) {
-		qWarning() << "Default format not supported - trying to use nearest";
+		//qWarning() << "Default format not supported - trying to use nearest";
 		m_format = info.nearestFormat(m_format);
 	}
 	
@@ -46,11 +46,11 @@ QThread() {
 
 //////////////////////////////////////////////////////////////////////////////
 /*! We've received a notification from our audio device */
-Engine::slotAudioDeviceNotification() {
+void Engine::slotAudioDeviceNotification() {
 	// Don't do anything, but spit out the notification as a warning
-	qWarning() << "bytesFree = " << m_pAudioOutput->bytesFree()
-			   << ", " << "elapsedUSecs = " << m_pAudioOutput->elapsedUSecs()
-			   << ", " << "processedUSecs = " << m_pAudioOutput->processedUSecs();
+// 	qWarning() << "bytesFree = " << m_pAudioOutput->bytesFree()
+// 			   << ", " << "elapsedUSecs = " << m_pAudioOutput->elapsedUSecs()
+// 			   << ", " << "processedUSecs = " << m_pAudioOutput->processedUSecs();
 } // end Engine::slotAudioDeviceNotification()
 
 
@@ -58,7 +58,7 @@ Engine::slotAudioDeviceNotification() {
 /*! Our audio device state has changed */
 void Engine::slotAudioDeviceStateChanged() {
 	// Spit out the new state as a warning
-	qWarning() << "state = " << state;
+	//qWarning() << "state = " << state;
 } // end Engine::slotAudioDeviceStateChanged()
 
 

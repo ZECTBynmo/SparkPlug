@@ -12,7 +12,7 @@
 #include <QIODevice>
 #include <QAudioOutput>
 
-class ENGINE_EXPORT Engine : public QThread {
+class /*ENGINE_EXPORT*/ Engine : public QThread {
 	Q_OBJECT
 public:
 	Engine();	//!< Initialize
