@@ -8,6 +8,7 @@
 #include "Engine.h"
 #include "sndfile.h"
 #include <vector>
+#include <QTimer>
 using namespace std;
 
 namespace {
@@ -73,13 +74,50 @@ void Engine::slotAudioDeviceStateChanged() {
 void Engine::openAudioFile() {
 
 	const int format=SF_FORMAT_WAV | SF_FORMAT_FLOAT;
-	const char* inFileName="E:/wankfest.wav";
+	const char* inFileName="E:/wa2nkfest.wav";
 
 	m_pAudioFile= new SndfileHandle( inFileName );
+	
+	// TEST STUFF:
+	// just trying to read some values into buffer to make sure everything is working
 	vector<float> buffer(10001);
 	m_pAudioFile->read( &buffer[0], 10000 );
 	int test=0;
 } // end Engine::openAudioFile()
+
+
+//////////////////////////////////////////////////////////////////////////////
+/*! Begin processing, called from the UI thread to start processing */
+void Engine::run() {
+	// This schedules the doTheWork() function
+	// to run just after our event loop starts up
+	QTimer::singleShot(0, this, SLOT(runProcessingThread()));
+
+	// This starts the event loop. Note that
+	// exec() does not return until the
+	// event loop is stopped.
+	exec(); 
+
+} // end Engine::run()
+
+
+//////////////////////////////////////////////////////////////////////////////
+/*! Perform DSP thread operations */
+void Engine::runProcessingThread() {
+	processBuffer();
+	
+	// Exit our thread running state, so that we're no longer blocking
+	// This makes sure that we're waiting for another run event
+	exit();
+} // end Engine::runProcessingThread()
+
+
+//////////////////////////////////////////////////////////////////////////////
+/*! Processes a buffer of audio */
+void Engine::processBuffer() {
+	// We can do our processing here and not worry about locking
+	int test = 0;
+} // end Engine::processBuffer()
 
 
 //////////////////////////////////////////////////////////////////////////////

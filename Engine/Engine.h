@@ -19,9 +19,14 @@ public:
 	Engine();	//!< Initialize
 	~Engine();
 	
+signals:
+	
 private slots:
 	void slotAudioDeviceNotification();		//!< We've received a notification from our audio device
 	void slotAudioDeviceStateChanged();		//!< Our audio device state has changed	
+
+protected:
+	void run();		//!< Begin processing, called from the UI thread to start processing
 
 private:
 	QAudioDeviceInfo m_pDevice;			//!< Our audio device info
@@ -29,6 +34,9 @@ private:
 	QIODevice* m_pOutput;				//!< A reference to the system IO device
 	QAudioFormat m_format;				//!< Our audio format struct
 	SndfileHandle* m_pAudioFile;		//!< The piece of audio we're currently looking at
+	
+	void runProcessingThread();			//!< Perform DSP thread operations
+	void processBuffer();				//!< Processes a buffer of audio
 	
 	void openAudioFile();				//!< Opens an audio file
 };
