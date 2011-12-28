@@ -28,7 +28,7 @@ private:
 	QAudioOutput* m_pAudioOutput;		//!< Our audio output
 	QIODevice* m_pOutput;				//!< A reference to the system IO device
 	QAudioFormat m_format;				//!< Our audio format struct
-	SndfileHandle* m_pAudioFile;			//!< The piece of audio we're currently looking at
+	SndfileHandle* m_pAudioFile;		//!< The piece of audio we're currently looking at
 	
 	void openAudioFile();				//!< Opens an audio file
 };

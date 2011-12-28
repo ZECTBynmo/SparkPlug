@@ -7,6 +7,8 @@
 // DevStudio!class Engine
 #include "Engine.h"
 #include "sndfile.h"
+#include <vector>
+using namespace std;
 
 namespace {
 	const uint SAMPLE_RATE= 44100,
@@ -74,6 +76,9 @@ void Engine::openAudioFile() {
 	const char* inFileName="E:/wankfest.wav";
 
 	m_pAudioFile= new SndfileHandle( inFileName );
+	vector<float> buffer(10001);
+	m_pAudioFile->read( &buffer[0], 10000 );
+	int test=0;
 } // end Engine::openAudioFile()
 
 
