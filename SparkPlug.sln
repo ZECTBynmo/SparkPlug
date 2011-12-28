@@ -2,6 +2,9 @@
 Microsoft Visual Studio Solution File, Format Version 10.00
 # Visual Studio 2008
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SparkPlug", "SparkPlug\SparkPlug.vcproj", "{8CEAFCD1-A4E5-435A-B345-F5C3AA301208}"
+	ProjectSection(ProjectDependencies) = postProject
+		{70D6E6CF-514F-4509-BF27-EAEAA7674838} = {70D6E6CF-514F-4509-BF27-EAEAA7674838}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Engine", "Engine\Engine.vcproj", "{70D6E6CF-514F-4509-BF27-EAEAA7674838}"
 EndProject
