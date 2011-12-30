@@ -55,10 +55,7 @@ m_bInjectAudioFromFile(true) {
 		m_fChunkFromFile[iChannel].resize( CHUNK_SIZE );
 	
 	// Setup our audio device
-	m_pAudioOutput = 0;
-	m_pAudioOutput = new QAudioOutput(m_pDevice, m_format, this);
-	connect(m_pAudioOutput, SIGNAL(notify()), this, SLOT(slotAudioDeviceNotification()));
-	connect(m_pAudioOutput, SIGNAL(stateChanged(QAudio::State)), this, SLOT(slotAudioDeviceStateChanged(QAudio::State)));
+	createAudioOutput();
 	
 	// Start up our IO device
 	m_pOutput= m_pAudioOutput->start();
@@ -67,6 +64,30 @@ m_bInjectAudioFromFile(true) {
 	// Open our audio
 	openAudioFile();
 } // end Engine::Engine()
+
+
+//////////////////////////////////////////////////////////////////////////////
+/*! Create our audio output */
+void Engine::createAudioOutput() {
+	m_pAudioOutput = 0;
+	m_pAudioOutput = new QAudioOutput(m_pDevice, m_format, this);
+	connect(m_pAudioOutput, SIGNAL(notify()), this, SLOT(slotAudioDeviceNotification()));
+	connect(m_pAudioOutput, SIGNAL(stateChanged(QAudio::State)), this, SLOT(slotAudioDeviceStateChanged(QAudio::State)));
+	
+	m_pOutput= m_pAudioOutput->start();
+	QAudio::Error err= m_pAudioOutput->error();
+} // end Engine::createAudioOutput()
+
+
+//////////////////////////////////////////////////////////////////////////////
+/*! Set a new audio device */
+void Engine::SetAudioDevice( const QAudioDeviceInfo& deviceInfo ) {
+	m_pAudioOutput->stop();
+	m_pAudioOutput->disconnect(this);
+	m_pDevice = deviceInfo;
+	createAudioOutput();
+	
+} // end Engine::setAudioDevice()
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -93,10 +114,13 @@ void Engine::openAudioFile() {
 
 	// Setup our wav format
 	const int format=SF_FORMAT_WAV | SF_FORMAT_FLOAT;
-	const char* inFileName="E:/wankfest.wav";
+	const char* inFileName="C:/TheXX-VCR.wav";
 
 	// Open the audio file
 	m_pAudioFile= new SndfileHandle( inFileName );
+	
+	// Read some audio !!TEST!!
+	readChunkOfAudioFromFile();
 } // end Engine::openAudioFile()
 
 
@@ -152,6 +176,8 @@ void Engine::runProcessingThread() {
 	// Get a timestamp for the start of this round of processing
 	m_uLastStartTime= QDateTime::currentMSecsSinceEpoch();
 	
+	m_uProcessCount++;
+	
 	// Clear out the previous buffer of audio
 	clearBuffer();
 	
@@ -175,15 +201,16 @@ void Engine::runProcessingThread() {
 /*! Schedule another round of processing */
 void Engine::scheduleProcessing() {
 	// Unless we're about to stop, kick off another round of processing
-	if( !m_bStopProcessing ) {	
+	if( m_bStopProcessing ) {	
+		// Exit the thread routine
+		m_bStopProcessing= false;
+		exit();
+	} else {
 		// Schedule the next round of processing for one second after this round started
-		qint64 iTimerDelay= 1000 - QDateTime::currentMSecsSinceEpoch() - m_uLastStartTime;
-		if( iTimerDelay < 100 )
-			iTimerDelay= 1000; // We're gonna skip or something
+		uint uBufferMS= 0/*1000.0f * ( (float)BUFFER_SIZE / (float)SAMPLE_RATE )*/;
+		qint64 iTimerDelay= uBufferMS /*- QDateTime::currentMSecsSinceEpoch() - m_uLastStartTime*/;
 
 		QTimer::singleShot( iTimerDelay, this, SLOT(slotRunProcessingThread()) );
-	} else {
-		exit();
 	}
 } // end Engine::scheduleProcessing()
 
@@ -216,7 +243,7 @@ void Engine::injectAudioFromFile() {
 void Engine::outputAudio() {
 	QByteArray tempAudio;
 
-	for( uint iSample= 0; iSample<BUFFER_SIZE; ++iSample ) {
+	for( uint iSample= m_uProcessCount*BUFFER_SIZE; iSample<m_uProcessCount*BUFFER_SIZE+BUFFER_SIZE; ++iSample ) {
 		tempAudio.append( reinterpret_cast<const char*>(&m_fChunkFromFile[0][iSample]), sizeof(m_fChunkFromFile[0][iSample]) );
 		m_pAudioBuffer->write( tempAudio );
 	}

@@ -22,6 +22,9 @@ public:
 	Engine();	//!< Initialize
 	~Engine();
 	
+	//! Set a new audio device
+	void SetAudioDevice( const QAudioDeviceInfo& deviceInfo );
+	
 signals:
 	
 private slots:
@@ -42,7 +45,8 @@ private:
 	bool m_bStopProcessing,				//!< Set when we're going to stop processing after next round;
 		 m_bInjectAudioFromFile;		//!< Set when we're injecting audio from some file into the processing stream
 		 
-	qint64 m_uLastStartTime;			//!< The time that the last round of processing started
+	qint64 m_uLastStartTime,			//!< The time that the last round of processing started
+		   m_uProcessCount;				//!< The number of times we've processed
 	
 	vector< vector<float> > m_fTempBuffer,		//!< A temporary buffer to hold audio samples before they're
 						    m_fChunkFromFile;		//!< The chunk of audio we've read from file and are holding in memory
@@ -65,6 +69,8 @@ private:
 	void outputAudio();
 	//! Reads a chunk of audio into memory for fast processing
 	void readChunkOfAudioFromFile();
+	//! Create our audio output
+	void createAudioOutput();
 };
 
 #endif // ENGINE_H

@@ -18,6 +18,7 @@ public:
 	
 private slots:
 	void slotStartProcessing();		//!< Starts our engine processing cycle
+	void slotDeviceChanged( int iDevice );		//!< Changes our audio device
 
 private:
 	Ui::SparkPlugClass ui;
