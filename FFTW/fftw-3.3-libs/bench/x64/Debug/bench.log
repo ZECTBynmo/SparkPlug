@@ -1,0 +1,8 @@
+﻿Build started 9/18/2011 6:43:14 PM.
+     1>Project "C:\FFTW\fftw-3.3-libs\bench\bench.vcxproj" on node 3 (build target(s)).
+     1>C:\Program Files\MSBuild\Microsoft.Cpp\v4.0\Platforms\x64\Microsoft.Cpp.x64.Targets(507,5): error MSB8008: Specified platform toolset (Windows7.1SDK) is not installed or invalid. Please make sure that a supported PlatformToolset value is selected.
+     1>Done Building Project "C:\FFTW\fftw-3.3-libs\bench\bench.vcxproj" (build target(s)) -- FAILED.
+
+Build FAILED.
+
+Time Elapsed 00:00:00.02
