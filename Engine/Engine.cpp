@@ -26,18 +26,19 @@ Engine::Engine() :
 QThread(),
 m_bStopProcessing(false),
 m_bInjectAudioFromFile(true),
-m_uProcessCount(0) {
+m_uProcessCount(0),
+m_uNumChannels(MAX_CHANNELS) {
 	
 	// We have to do this to make sure our thread has the correct affinity.
 	moveToThread(this);
 	
 	// Setup our audio format struct
 	m_format.setFrequency( SAMPLE_RATE );
-	m_format.setChannels( 2 );
-	m_format.setSampleSize( 16 );
-	m_format.setCodec( "audio/pcm" );
-	m_format.setByteOrder( QAudioFormat::LittleEndian );
-	m_format.setSampleType( QAudioFormat::Float );
+	m_format.setChannels( m_uNumChannels );
+// 	m_format.setSampleSize( 32 );
+// 	m_format.setCodec( "audio/pcm" );
+// 	m_format.setByteOrder( QAudioFormat::LittleEndian );
+// 	m_format.setSampleType( QAudioFormat::Float );
 	
 	// Setup our audio device information
 	QAudioDeviceInfo info( QAudioDeviceInfo::defaultOutputDevice() );
@@ -51,6 +52,7 @@ m_uProcessCount(0) {
 	
 	// Allocate for a temp buffer
 	m_fTempBuffer.resize( BUFFER_SIZE );
+	m_fTempChunk.resize( CHUNK_SIZE );
 	m_fChunkFromFile.resize( MAX_CHANNELS );
 	for( uint iChannel=0; iChannel<MAX_CHANNELS; ++iChannel )
 		m_fChunkFromFile[iChannel].resize( CHUNK_SIZE );
@@ -86,6 +88,11 @@ void Engine::SetAudioDevice( const QAudioDeviceInfo& deviceInfo ) {
 	m_pAudioOutput->stop();
 	m_pAudioOutput->disconnect(this);
 	m_pDevice = deviceInfo;
+	
+	// Setup our audio device information
+	if ( !m_pDevice.isFormatSupported(deviceInfo.preferredFormat()) ) {
+		m_format = m_pDevice.nearestFormat( deviceInfo.preferredFormat() );
+	}
 	createAudioOutput();
 	
 } // end Engine::setAudioDevice()
@@ -115,13 +122,23 @@ void Engine::openAudioFile() {
 
 	// Setup our wav format
 	const int format=SF_FORMAT_WAV | SF_FORMAT_FLOAT;
-	const char* inFileName="E:/song.wav";
+	const char* inFileName="E:/echoooo.wav";
 
 	// Open the audio file
 	m_pAudioFile= new SndfileHandle( inFileName );
 	
 	uint uSampleRate= m_pAudioFile->samplerate(),
 		 uNumChannels= m_pAudioFile->channels();
+		 
+	m_format.setSampleRate( uSampleRate );
+	m_format.setChannelCount( uNumChannels );
+	m_format.setChannels( m_uNumChannels );
+	
+	// Recreate our audio output because we have a new format
+	createAudioOutput();
+			 
+	// Set our current number of channels
+	m_uNumChannels= uNumChannels;
 		 
 	// Read some audio !!TEST!!
 	readChunkOfAudioFromFile();
@@ -132,8 +149,29 @@ void Engine::openAudioFile() {
 /*! Reads a chunk of audio into memory for fast processing */
 void Engine::readChunkOfAudioFromFile() {
 	// Read in a chunk of audio
-	uint uSamplesRead= m_pAudioFile->read( &m_fChunkFromFile[0][0], CHUNK_SIZE );
+	if( m_uNumChannels > 1 ) {
+		// Read audio into our temp chunk buffer
+		uint uSamplesRead= m_pAudioFile->read( &m_fTempChunk[0], CHUNK_SIZE );
+		
+		// Separate the audio we've read into two channels
+		separateChannels();
+	} else {
+		// Read mono data directly into our chunk
+		uint uSamplesRead= m_pAudioFile->read( &m_fChunkFromFile[0][0], CHUNK_SIZE );
+	}
 } // end Engine::readChunkOfAudioFromFile()
+
+
+//////////////////////////////////////////////////////////////////////////////
+/*! Split the temporary buffer into two channels */
+void Engine::separateChannels() {
+	uint iFrame= 0;
+	for( uint iSample=0; iSample<m_fTempChunk.size(); iSample+= 2 ) {
+		m_fChunkFromFile[0][iFrame]= m_fTempChunk[iSample];
+		m_fChunkFromFile[1][iFrame]= m_fTempChunk[iSample];
+		iFrame++;		
+	}
+} // end Engine::separateChannels()
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -256,7 +294,9 @@ void Engine::injectAudioFromFile() {
 void Engine::outputAudio() {
 	QByteArray tempAudio;
 
-	uint uBufferStart= m_uProcessCount*BUFFER_SIZE,
+	uint uPeriod= m_pAudioOutput->periodSize();
+
+	uint uBufferStart= m_uProcessCount*uPeriod,
 		 uBufferEnd= m_uProcessCount*BUFFER_SIZE + BUFFER_SIZE;
 		 
 // 	for( uint iSample= uBufferStart; iSample<uBufferEnd; ++iSample ) {
@@ -264,15 +304,15 @@ void Engine::outputAudio() {
 // 			m_bStopProcessing= true;
 // 			return;
 // 		}
-// 		
+// 		q
 // 		tempAudio.append( reinterpret_cast<const char*>(&m_fChunkFromFile[0][iSample]), sizeof(m_fChunkFromFile[0][iSample]) );
 // 		m_pAudioBuffer->wo rite( tempAudio );
 // 	}
 	
 	if( m_pOutput ) {
 // 		m_pOutput->write( m_pAudioBuffer->data(), m_pAudioOutput->periodSize() );
-		if( uBufferStart + 2*BUFFER_SIZE < m_fChunkFromFile[0].size() )
-			m_pOutput->write( (const char*)&m_fChunkFromFile[0][uBufferStart], BUFFER_SIZE*sizeof(float) );
+		if( uBufferStart + 2*uPeriod < m_fChunkFromFile[0].size() )
+			m_pOutput->write( (const char*)&m_fChunkFromFile[0][uBufferStart], 1*uPeriod*sizeof(float) );
 		else {
 			m_bStopProcessing= true;
 			return;

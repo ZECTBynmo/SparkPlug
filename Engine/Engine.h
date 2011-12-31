@@ -45,13 +45,19 @@ private:
 	bool m_bStopProcessing,				//!< Set when we're going to stop processing after next round;
 		 m_bInjectAudioFromFile;		//!< Set when we're injecting audio from some file into the processing stream
 		 
+	uint m_uNumChannels;				//<! Our current number of channels
+		 
 	qint64 m_uLastStartTime,			//!< The time that the last round of processing started
 		   m_uProcessCount;				//!< The number of times we've processed
+		
+	vector<float> m_fTempChunk;			//!< A temporary 1d vector to hold the chunk of audio
 	
 	vector< vector<float> > m_fTempBuffer,			//!< A temporary buffer to hold audio samples before they're
 						    m_fChunkFromFile;		//!< The chunk of audio we've read from file and are holding in memory
 
 	QBuffer* m_pAudioBuffer;			//<! The current buffer of audio we're working with
+	
+	
 	
 	//! Perform DSP thread operations
 	void runProcessingThread();	
@@ -69,6 +75,8 @@ private:
 	void outputAudio();
 	//! Reads a chunk of audio into memory for fast processing
 	void readChunkOfAudioFromFile();
+	//! Split the temporary buffer into two channels
+	void separateChannels();	
 	//! Create our audio output
 	void createAudioOutput();
 };
