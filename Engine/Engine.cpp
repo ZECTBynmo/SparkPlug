@@ -16,7 +16,7 @@ namespace {
 	const uint SAMPLE_RATE= 44100,				// Only one sample rate for now
 			   BUFFER_SIZE= 8192,				// Only one buffer size for now
 			   MAX_CHANNELS= 2,					// Just change this to 1 for mono
-			   CHUNK_SIZE= BUFFER_SIZE * 10000;	// The number of samples we read from an audio fle at a time
+			   CHUNK_SIZE= BUFFER_SIZE * 10000;	// The number of samples we read from an audio file at a time
 			 
 }
 
@@ -27,7 +27,8 @@ QThread(),
 m_bStopProcessing(false),
 m_bInjectAudioFromFile(true),
 m_uProcessCount(0),
-m_uNumChannels(MAX_CHANNELS) {
+m_uNumChannels(MAX_CHANNELS),
+m_uBufferSize(BUFFER_SIZE) {
 	
 	// We have to do this to make sure our thread has the correct affinity.
 	moveToThread(this);
@@ -35,8 +36,8 @@ m_uNumChannels(MAX_CHANNELS) {
 	// Setup our audio format struct
 	m_format.setFrequency( SAMPLE_RATE );
 	m_format.setChannels( m_uNumChannels );
-// 	m_format.setSampleSize( 32 );
-// 	m_format.setCodec( "audio/pcm" );
+ 	m_format.setSampleSize( 16 );
+ 	m_format.setCodec( "pcm" );
 // 	m_format.setByteOrder( QAudioFormat::LittleEndian );
 // 	m_format.setSampleType( QAudioFormat::Float );
 	
@@ -51,7 +52,7 @@ m_uNumChannels(MAX_CHANNELS) {
 	m_pAudioBuffer= new QBuffer();
 	
 	// Allocate for a temp buffer
-	m_fTempBuffer.resize( BUFFER_SIZE );
+	m_fTempBuffer.resize( m_uBufferSize );
 	m_fTempChunk.resize( CHUNK_SIZE );
 	m_fChunkFromFile.resize( MAX_CHANNELS );
 	for( uint iChannel=0; iChannel<MAX_CHANNELS; ++iChannel )
@@ -79,6 +80,8 @@ void Engine::createAudioOutput() {
 	
 	m_pOutput= m_pAudioOutput->start();
 	QAudio::Error err= m_pAudioOutput->error();
+	
+	m_uBufferSize= m_pAudioOutput->periodSize();
 } // end Engine::createAudioOutput()
 
 
@@ -119,10 +122,67 @@ void Engine::slotAudioDeviceStateChanged() {
 //////////////////////////////////////////////////////////////////////////////
 /*! Opens an audio file */
 void Engine::openAudioFile() {
+//////////////////////////////////////////////////////////////////////////
+// libSndFile quick format reference
+//////////////////////////////////////////////////////////////////////////
+// 	    /* Major formats. */
+// 		SF_FORMAT_WAV          = 0x010000,     /* Microsoft WAV format (little endian). */
+// 		SF_FORMAT_AIFF         = 0x020000,     /* Apple/SGI AIFF format (big endian). */
+// 		SF_FORMAT_AU           = 0x030000,     /* Sun/NeXT AU format (big endian). */
+// 		SF_FORMAT_RAW          = 0x040000,     /* RAW PCM data. */
+// 		SF_FORMAT_PAF          = 0x050000,     /* Ensoniq PARIS file format. */
+// 		SF_FORMAT_SVX          = 0x060000,     /* Amiga IFF / SVX8 / SV16 format. */
+// 		SF_FORMAT_NIST         = 0x070000,     /* Sphere NIST format. */
+// 		SF_FORMAT_VOC          = 0x080000,     /* VOC files. */
+// 		SF_FORMAT_IRCAM        = 0x0A0000,     /* Berkeley/IRCAM/CARL */
+// 		SF_FORMAT_W64          = 0x0B0000,     /* Sonic Foundry's 64 bit RIFF/WAV */
+// 		SF_FORMAT_MAT4         = 0x0C0000,     /* Matlab (tm) V4.2 / GNU Octave 2.0 */
+// 		SF_FORMAT_MAT5         = 0x0D0000,     /* Matlab (tm) V5.0 / GNU Octave 2.1 */
+// 
+// 		/* Subtypes from here on. */
+// 
+// 		SF_FORMAT_PCM_S8       = 0x0001,       /* Signed 8 bit data */
+// 		SF_FORMAT_PCM_16       = 0x0002,       /* Signed 16 bit data */
+// 		SF_FORMAT_PCM_24       = 0x0003,       /* Signed 24 bit data */
+// 		SF_FORMAT_PCM_32       = 0x0004,       /* Signed 32 bit data */
+// 
+// 		SF_FORMAT_PCM_U8       = 0x0005,       /* Unsigned 8 bit data (WAV and RAW only) */
+// 
+// 		SF_FORMAT_FLOAT        = 0x0006,       /* 32 bit float data */
+// 		SF_FORMAT_DOUBLE       = 0x0007,       /* 64 bit float data */
+// 
+// 		SF_FORMAT_ULAW         = 0x0010,       /* U-Law encoded. */
+// 		SF_FORMAT_ALAW         = 0x0011,       /* A-Law encoded. */
+// 		SF_FORMAT_IMA_ADPCM    = 0x0012,       /* IMA ADPCM. */
+// 		SF_FORMAT_MS_ADPCM     = 0x0013,       /* Microsoft ADPCM. */
+// 
+// 		SF_FORMAT_GSM610       = 0x0020,       /* GSM 6.10 encoding. */
+// 		SF_FORMAT_VOX_ADPCM    = 0x0021,       /* Oki Dialogic ADPCM encoding. */
+// 
+// 		SF_FORMAT_G721_32      = 0x0030,       /* 32kbs G721 ADPCM encoding. */
+// 		SF_FORMAT_G723_24      = 0x0031,       /* 24kbs G723 ADPCM encoding. */
+// 		SF_FORMAT_G723_40      = 0x0032,       /* 40kbs G723 ADPCM encoding. */
+// 
+// 		SF_FORMAT_DWVW_12      = 0x0040,       /* 12 bit Delta Width Variable Word encoding. */
+// 		SF_FORMAT_DWVW_16      = 0x0041,       /* 16 bit Delta Width Variable Word encoding. */
+// 		SF_FORMAT_DWVW_24      = 0x0042,       /* 24 bit Delta Width Variable Word encoding. */
+// 		SF_FORMAT_DWVW_N       = 0x0043,       /* N bit Delta Width Variable Word encoding. */
+// 
+// 		/* Endian-ness options. */
+// 
+// 		SF_ENDIAN_FILE         = 0x00000000,   /* Default file endian-ness. */
+// 		SF_ENDIAN_LITTLE       = 0x10000000,   /* Force little endian-ness. */
+// 		SF_ENDIAN_BIG          = 0x20000000,   /* Force big endian-ness. */
+// 		SF_ENDIAN_CPU          = 0x30000000,   /* Force CPU endian-ness. */
+// 
+// 		SF_FORMAT_SUBMASK      = 0x0000FFFF,
+// 		SF_FORMAT_TYPEMASK     = 0x0FFF0000,
+// 		SF_FORMAT_ENDMASK      = 0x30000000
+//////////////////////////////////////////////////////////////////////////
 
 	// Setup our wav format
 	const int format= SF_FORMAT_WAV | SF_FORMAT_FLOAT;
-	const char* inFileName="C:/TheXX-VCR.wav";
+	const char* inFileName="C:/burst3.wav";
 
 	// Open the audio file
 	m_pAudioFile= new SndfileHandle( inFileName );
@@ -130,9 +190,13 @@ void Engine::openAudioFile() {
 	uint uSampleRate= m_pAudioFile->samplerate(),
 		 uNumChannels= m_pAudioFile->channels();
 		 
+	int iWavFormat= m_pAudioFile->format();
+		 
 	m_format.setSampleRate( uSampleRate );
 	m_format.setChannelCount( uNumChannels );
 	m_format.setChannels( m_uNumChannels );
+	
+	m_uSampleRate= uSampleRate;
 	
 	// Recreate our audio output because we have a new format
 	createAudioOutput();
@@ -168,7 +232,7 @@ void Engine::separateChannels() {
 	uint iFrame= 0;
 	for( uint iSample=0; iSample<m_fTempChunk.size(); iSample+= 2 ) {
 		m_fChunkFromFile[0][iFrame]= m_fTempChunk[iSample];
-		m_fChunkFromFile[1][iFrame]= m_fTempChunk[iSample];
+		m_fChunkFromFile[1][iFrame]= m_fTempChunk[iSample+1];
 		iFrame++;		
 	}
 } // end Engine::separateChannels()
@@ -236,6 +300,7 @@ void Engine::runProcessingThread() {
 	
 	// Schedule another round of processing
 	scheduleProcessing();
+	
 } // end Engine::runProcessingThread()
 
 
@@ -254,12 +319,12 @@ void Engine::scheduleProcessing() {
 		exit();
 	} else {
 		// Schedule the next round of processing for one second after this round started
-		uint uBufferMS= 1000 * ( (float)BUFFER_SIZE / (float)SAMPLE_RATE );
+		uint uBufferMS= 1000.0f * ( (float)m_uBufferSize / (float)m_uSampleRate );
 		qint64 iTimerDelay;
-		//if( QDateTime::currentMSecsSinceEpoch() > m_uLastStartTime + uBufferMS )
+		if( QDateTime::currentMSecsSinceEpoch() < m_uLastStartTime + uBufferMS )
 			iTimerDelay= uBufferMS - QDateTime::currentMSecsSinceEpoch() + m_uLastStartTime;
-		//else 
-		//	iTimerDelay= 0;
+		else 
+			iTimerDelay= 0;
 
 		QTimer::singleShot( iTimerDelay, this, SLOT(slotRunProcessingThread()) );
 	}
@@ -294,28 +359,15 @@ void Engine::injectAudioFromFile() {
 void Engine::outputAudio() {
 	QByteArray tempAudio;
 
-	uint uPeriod= m_pAudioOutput->periodSize();
-
-	uint uBufferStart= m_uProcessCount*BUFFER_SIZE,
-		 uBufferEnd= m_uProcessCount*BUFFER_SIZE + BUFFER_SIZE;
-		 
-// 	for( uint iSample= uBufferStart; iSample<uBufferEnd; ++iSample ) {
-// 		if( iSample >= m_fChunkFromFile[0].size() ) {
-// 			m_bStopProcessing= true;
-// 			return;
-// 		}
-// 		q
-// 		tempAudio.append( reinterpret_cast<const char*>(&m_fChunkFromFile[0][iSample]), sizeof(m_fChunkFromFile[0][iSample]) );
-// 		m_pAudioBuffer->wo rite( tempAudio );
-// 	}
+	uint uBufferStart= (m_uProcessCount-1)*m_uBufferSize,
+		 uBufferEnd= m_uProcessCount*m_uBufferSize + m_uBufferSize;
 	
 	if( m_pOutput ) {
-// 		m_pOutput->write( m_pAudioBuffer->data(), m_pAudioOutput->periodSize() );
-		if( uBufferStart + 2*BUFFER_SIZE < m_fChunkFromFile[0].size() )
-			m_pOutput->write( (const char*)&m_fChunkFromFile[0][uBufferStart], m_format.channelCount()*BUFFER_SIZE*sizeof(float) );
+		if( uBufferStart + 2*m_uBufferSize < m_fChunkFromFile[0].size() )
+			m_pOutput->write( (const char*)&m_fChunkFromFile[0][uBufferStart], /*2**/m_uNumChannels*m_uBufferSize*sizeof(float) );
 		else {
 			m_bStopProcessing= true;
-			return;
+			return; 
 		}		
 	} else {
 		m_bStopProcessing= true;

@@ -45,7 +45,9 @@ private:
 	bool m_bStopProcessing,				//!< Set when we're going to stop processing after next round;
 		 m_bInjectAudioFromFile;		//!< Set when we're injecting audio from some file into the processing stream
 		 
-	uint m_uNumChannels;				//<! Our current number of channels
+	uint m_uNumChannels,				//!< Our current number of channels
+		 m_uBufferSize,					//!< Out current buffer size 
+		 m_uSampleRate;
 		 
 	qint64 m_uLastStartTime,			//!< The time that the last round of processing started
 		   m_uProcessCount;				//!< The number of times we've processed
