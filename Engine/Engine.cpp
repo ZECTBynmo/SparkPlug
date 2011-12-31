@@ -121,8 +121,8 @@ void Engine::slotAudioDeviceStateChanged() {
 void Engine::openAudioFile() {
 
 	// Setup our wav format
-	const int format=SF_FORMAT_WAV | SF_FORMAT_FLOAT;
-	const char* inFileName="E:/echoooo.wav";
+	const int format= SF_FORMAT_WAV | SF_FORMAT_FLOAT;
+	const char* inFileName="C:/TheXX-VCR.wav";
 
 	// Open the audio file
 	m_pAudioFile= new SndfileHandle( inFileName );
@@ -254,14 +254,14 @@ void Engine::scheduleProcessing() {
 		exit();
 	} else {
 		// Schedule the next round of processing for one second after this round started
-		uint uBufferMS= 1000.0f * ( (float)BUFFER_SIZE / (float)SAMPLE_RATE );
+		uint uBufferMS= 1000 * ( (float)BUFFER_SIZE / (float)SAMPLE_RATE );
 		qint64 iTimerDelay;
-		if( QDateTime::currentMSecsSinceEpoch() > m_uLastStartTime + uBufferMS )
-			iTimerDelay= uBufferMS - QDateTime::currentMSecsSinceEpoch() - m_uLastStartTime;
-		else 
-			iTimerDelay= 0;
+		//if( QDateTime::currentMSecsSinceEpoch() > m_uLastStartTime + uBufferMS )
+			iTimerDelay= uBufferMS - QDateTime::currentMSecsSinceEpoch() + m_uLastStartTime;
+		//else 
+		//	iTimerDelay= 0;
 
-		QTimer::singleShot( uBufferMS, this, SLOT(slotRunProcessingThread()) );
+		QTimer::singleShot( iTimerDelay, this, SLOT(slotRunProcessingThread()) );
 	}
 } // end Engine::scheduleProcessing()
 
@@ -296,7 +296,7 @@ void Engine::outputAudio() {
 
 	uint uPeriod= m_pAudioOutput->periodSize();
 
-	uint uBufferStart= m_uProcessCount*uPeriod,
+	uint uBufferStart= m_uProcessCount*BUFFER_SIZE,
 		 uBufferEnd= m_uProcessCount*BUFFER_SIZE + BUFFER_SIZE;
 		 
 // 	for( uint iSample= uBufferStart; iSample<uBufferEnd; ++iSample ) {
@@ -311,8 +311,8 @@ void Engine::outputAudio() {
 	
 	if( m_pOutput ) {
 // 		m_pOutput->write( m_pAudioBuffer->data(), m_pAudioOutput->periodSize() );
-		if( uBufferStart + 2*uPeriod < m_fChunkFromFile[0].size() )
-			m_pOutput->write( (const char*)&m_fChunkFromFile[0][uBufferStart], 1*uPeriod*sizeof(float) );
+		if( uBufferStart + 2*BUFFER_SIZE < m_fChunkFromFile[0].size() )
+			m_pOutput->write( (const char*)&m_fChunkFromFile[0][uBufferStart], m_format.channelCount()*BUFFER_SIZE*sizeof(float) );
 		else {
 			m_bStopProcessing= true;
 			return;
