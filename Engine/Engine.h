@@ -48,7 +48,7 @@ private:
 	qint64 m_uLastStartTime,			//!< The time that the last round of processing started
 		   m_uProcessCount;				//!< The number of times we've processed
 	
-	vector< vector<float> > m_fTempBuffer,		//!< A temporary buffer to hold audio samples before they're
+	vector< vector<float> > m_fTempBuffer,			//!< A temporary buffer to hold audio samples before they're
 						    m_fChunkFromFile;		//!< The chunk of audio we've read from file and are holding in memory
 
 	QBuffer* m_pAudioBuffer;			//<! The current buffer of audio we're working with

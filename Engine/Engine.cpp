@@ -15,7 +15,7 @@ using namespace std;
 namespace {
 	const uint SAMPLE_RATE= 44100,				// Only one sample rate for now
 			   BUFFER_SIZE= 8192,				// Only one buffer size for now
-			   MAX_CHANNELS= 1,					// Just change this to 1 for mono
+			   MAX_CHANNELS= 2,					// Just change this to 1 for mono
 			   CHUNK_SIZE= BUFFER_SIZE * 10000;	// The number of samples we read from an audio fle at a time
 			 
 }
@@ -120,6 +120,9 @@ void Engine::openAudioFile() {
 	// Open the audio file
 	m_pAudioFile= new SndfileHandle( inFileName );
 	
+	uint uSampleRate= m_pAudioFile->samplerate(),
+		 uNumChannels= m_pAudioFile->channels();
+		 
 	// Read some audio !!TEST!!
 	readChunkOfAudioFromFile();
 } // end Engine::openAudioFile()
@@ -205,13 +208,22 @@ void Engine::scheduleProcessing() {
 	if( m_bStopProcessing ) {	
 		// Exit the thread routine
 		m_bStopProcessing= false;
+		
+		// Reset our processing count
+		m_uProcessCount= 0;
+		
+		// Exit the processing round for good (THIS EXITS THE THREAD, BAD!)
 		exit();
 	} else {
 		// Schedule the next round of processing for one second after this round started
-		uint uBufferMS= 0/*1000.0f * ( (float)BUFFER_SIZE / (float)SAMPLE_RATE )*/;
-		qint64 iTimerDelay= uBufferMS /*- QDateTime::currentMSecsSinceEpoch() - m_uLastStartTime*/;
+		uint uBufferMS= 1000.0f * ( (float)BUFFER_SIZE / (float)SAMPLE_RATE );
+		qint64 iTimerDelay;
+		if( QDateTime::currentMSecsSinceEpoch() > m_uLastStartTime + uBufferMS )
+			iTimerDelay= uBufferMS - QDateTime::currentMSecsSinceEpoch() - m_uLastStartTime;
+		else 
+			iTimerDelay= 0;
 
-		QTimer::singleShot( iTimerDelay, this, SLOT(slotRunProcessingThread()) );
+		QTimer::singleShot( uBufferMS, this, SLOT(slotRunProcessingThread()) );
 	}
 } // end Engine::scheduleProcessing()
 
@@ -247,18 +259,27 @@ void Engine::outputAudio() {
 	uint uBufferStart= m_uProcessCount*BUFFER_SIZE,
 		 uBufferEnd= m_uProcessCount*BUFFER_SIZE + BUFFER_SIZE;
 		 
-	for( uint iSample= uBufferStart; iSample<uBufferEnd; ++iSample ) {
-		if( iSample >= m_fChunkFromFile[0].size() ) {
-			m_bStopProcessing= true;
-			return;
-		}
-		
-		tempAudio.append( reinterpret_cast<const char*>(&m_fChunkFromFile[0][iSample]), sizeof(m_fChunkFromFile[0][iSample]) );
-		m_pAudioBuffer->write( tempAudio );
-	}
+// 	for( uint iSample= uBufferStart; iSample<uBufferEnd; ++iSample ) {
+// 		if( iSample >= m_fChunkFromFile[0].size() ) {
+// 			m_bStopProcessing= true;
+// 			return;
+// 		}
+// 		
+// 		tempAudio.append( reinterpret_cast<const char*>(&m_fChunkFromFile[0][iSample]), sizeof(m_fChunkFromFile[0][iSample]) );
+// 		m_pAudioBuffer->wo rite( tempAudio );
+// 	}
 	
 	if( m_pOutput ) {
-		m_pOutput->write( m_pAudioBuffer->data(), m_pAudioOutput->periodSize() );
+// 		m_pOutput->write( m_pAudioBuffer->data(), m_pAudioOutput->periodSize() );
+		if( uBufferStart + 2*BUFFER_SIZE < m_fChunkFromFile[0].size() )
+			m_pOutput->write( (const char*)&m_fChunkFromFile[0][uBufferStart], BUFFER_SIZE*sizeof(float) );
+		else {
+			m_bStopProcessing= true;
+			return;
+		}		
+	} else {
+		m_bStopProcessing= true;
+		return;
 	}
 } // end Engine::outputAudio()
 
