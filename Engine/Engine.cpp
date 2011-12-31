@@ -16,7 +16,7 @@ namespace {
 	const uint SAMPLE_RATE= 44100,				// Only one sample rate for now
 			   BUFFER_SIZE= 8192,				// Only one buffer size for now
 			   MAX_CHANNELS= 1,					// Just change this to 1 for mono
-			   CHUNK_SIZE= BUFFER_SIZE * 1000;	// The number of samples we read from an audio fle at a time
+			   CHUNK_SIZE= BUFFER_SIZE * 10000;	// The number of samples we read from an audio fle at a time
 			 
 }
 
@@ -25,7 +25,8 @@ namespace {
 Engine::Engine() :
 QThread(),
 m_bStopProcessing(false),
-m_bInjectAudioFromFile(true) {
+m_bInjectAudioFromFile(true),
+m_uProcessCount(0) {
 	
 	// We have to do this to make sure our thread has the correct affinity.
 	moveToThread(this);
@@ -114,7 +115,7 @@ void Engine::openAudioFile() {
 
 	// Setup our wav format
 	const int format=SF_FORMAT_WAV | SF_FORMAT_FLOAT;
-	const char* inFileName="C:/TheXX-VCR.wav";
+	const char* inFileName="E:/song.wav";
 
 	// Open the audio file
 	m_pAudioFile= new SndfileHandle( inFileName );
@@ -128,7 +129,7 @@ void Engine::openAudioFile() {
 /*! Reads a chunk of audio into memory for fast processing */
 void Engine::readChunkOfAudioFromFile() {
 	// Read in a chunk of audio
-	m_pAudioFile->read( &m_fChunkFromFile[0][0], CHUNK_SIZE );
+	uint uSamplesRead= m_pAudioFile->read( &m_fChunkFromFile[0][0], CHUNK_SIZE );
 } // end Engine::readChunkOfAudioFromFile()
 
 
@@ -243,7 +244,15 @@ void Engine::injectAudioFromFile() {
 void Engine::outputAudio() {
 	QByteArray tempAudio;
 
-	for( uint iSample= m_uProcessCount*BUFFER_SIZE; iSample<m_uProcessCount*BUFFER_SIZE+BUFFER_SIZE; ++iSample ) {
+	uint uBufferStart= m_uProcessCount*BUFFER_SIZE,
+		 uBufferEnd= m_uProcessCount*BUFFER_SIZE + BUFFER_SIZE;
+		 
+	for( uint iSample= uBufferStart; iSample<uBufferEnd; ++iSample ) {
+		if( iSample >= m_fChunkFromFile[0].size() ) {
+			m_bStopProcessing= true;
+			return;
+		}
+		
 		tempAudio.append( reinterpret_cast<const char*>(&m_fChunkFromFile[0][iSample]), sizeof(m_fChunkFromFile[0][iSample]) );
 		m_pAudioBuffer->write( tempAudio );
 	}
