@@ -10,6 +10,10 @@
 #include <vector>
 #include <QTimer>
 #include "qdatetime.h"
+#include "Generator.h"
+#include "qaudioformat.h"
+#include "qendian.h"
+
 using namespace std;
 
 namespace {
@@ -28,7 +32,8 @@ m_bStopProcessing(false),
 m_bInjectAudioFromFile(true),
 m_uProcessCount(0),
 m_uNumChannels(MAX_CHANNELS),
-m_uBufferSize(BUFFER_SIZE) {
+m_uBufferSize(BUFFER_SIZE),
+m_uNumSamples(CHUNK_SIZE) {
 	
 	// We have to do this to make sure our thread has the correct affinity.
 	moveToThread(this);
@@ -36,10 +41,10 @@ m_uBufferSize(BUFFER_SIZE) {
 	// Setup our audio format struct
 	m_format.setFrequency( SAMPLE_RATE );
 	m_format.setChannels( m_uNumChannels );
- 	m_format.setSampleSize( 16 );
+ 	m_format.setSampleSize( 4 );
  	m_format.setCodec( "pcm" );
 // 	m_format.setByteOrder( QAudioFormat::LittleEndian );
-// 	m_format.setSampleType( QAudioFormat::Float );
+ 	m_format.setSampleType( QAudioFormat::Float );
 	
 	// Setup our audio device information
 	QAudioDeviceInfo info( QAudioDeviceInfo::defaultOutputDevice() );
@@ -55,8 +60,9 @@ m_uBufferSize(BUFFER_SIZE) {
 	m_fTempBuffer.resize( m_uBufferSize );
 	m_fTempChunk.resize( CHUNK_SIZE );
 	m_fChunkFromFile.resize( MAX_CHANNELS );
-	for( uint iChannel=0; iChannel<MAX_CHANNELS; ++iChannel )
+	for( uint iChannel=0; iChannel<MAX_CHANNELS; ++iChannel ) {
 		m_fChunkFromFile[iChannel].resize( CHUNK_SIZE );
+	}
 	
 	// Setup our audio device
 	createAudioOutput();
@@ -81,6 +87,8 @@ void Engine::createAudioOutput() {
 	m_pOutput= m_pAudioOutput->start();
 	QAudio::Error err= m_pAudioOutput->error();
 	
+	//m_pGenerator= new Generator( m_format, m_uNumSamples, m_uSampleRate, this );
+	
 	m_uBufferSize= m_pAudioOutput->periodSize();
 } // end Engine::createAudioOutput()
 
@@ -91,6 +99,10 @@ void Engine::SetAudioDevice( const QAudioDeviceInfo& deviceInfo ) {
 	m_pAudioOutput->stop();
 	m_pAudioOutput->disconnect(this);
 	m_pDevice = deviceInfo;
+	
+	// Set the use of float data
+	m_format.setSampleType( QAudioFormat::Float );
+	m_format.setSampleSize( 4 );
 	
 	// Setup our audio device information
 	if ( !m_pDevice.isFormatSupported(deviceInfo.preferredFormat()) ) {
@@ -182,7 +194,7 @@ void Engine::openAudioFile() {
 
 	// Setup our wav format
 	const int format= SF_FORMAT_WAV | SF_FORMAT_FLOAT;
-	const char* inFileName="C:/burst3.wav";
+	const char* inFileName="C:/song.wav";
 
 	// Open the audio file
 	m_pAudioFile= new SndfileHandle( inFileName );
@@ -215,13 +227,13 @@ void Engine::readChunkOfAudioFromFile() {
 	// Read in a chunk of audio
 	if( m_uNumChannels > 1 ) {
 		// Read audio into our temp chunk buffer
-		uint uSamplesRead= m_pAudioFile->read( &m_fTempChunk[0], CHUNK_SIZE );
+		m_uNumSamples= m_pAudioFile->read( &m_fTempChunk[0], CHUNK_SIZE );
 		
 		// Separate the audio we've read into two channels
 		separateChannels();
 	} else {
 		// Read mono data directly into our chunk
-		uint uSamplesRead= m_pAudioFile->read( &m_fChunkFromFile[0][0], CHUNK_SIZE );
+		m_uNumSamples= m_pAudioFile->readf( &m_fChunkFromFile[0][0], CHUNK_SIZE );
 	}
 } // end Engine::readChunkOfAudioFromFile()
 
@@ -249,7 +261,7 @@ void Engine::run() {
 	// exec() does not return until the
 	// event loop is stopped.
 	exec();
-		
+	
 } // end Engine::run()
 
 
@@ -275,8 +287,7 @@ void Engine::runProcessingThread() {
 	//
 	// Because we get timestamps in milliseconds, we can't be any more
 	// accurately regular than +/- 1ms, and the actual regularity may be
-	// skewed more than that by the locking process inherent in the 
-	// signal/slot system to the outside world
+	// skewed more by any of a number of factors
 	//////////////////////////////////////////////////////////////////////////
 	
 	// Get a timestamp for the start of this round of processing
@@ -361,10 +372,26 @@ void Engine::outputAudio() {
 
 	uint uBufferStart= (m_uProcessCount-1)*m_uBufferSize,
 		 uBufferEnd= m_uProcessCount*m_uBufferSize + m_uBufferSize;
+		 
+	// TODO: Get rid of this test stuff
+	QAudioFormat::Endian byteOrd= m_format.byteOrder();
+	uint uChannels= m_format.channelCount(),
+		 uBytes= m_format.sampleSize(),
+		 uFloatSize= sizeof(float);
+		 
+	QAudioFormat::SampleType format= m_format.sampleType();
+		 
+	uint samplesToWrite= m_pAudioOutput->periodSize();
+
 	
 	if( m_pOutput ) {
 		if( uBufferStart + 2*m_uBufferSize < m_fChunkFromFile[0].size() )
-			m_pOutput->write( (const char*)&m_fChunkFromFile[0][uBufferStart], /*2**/m_uNumChannels*m_uBufferSize*sizeof(float) );
+// 			for( uint iWriteCycle=0; (iWriteCycle+2)*samplesToWrite<m_fChunkFromFile[0].size(); ++iWriteCycle ) {
+// 				uint uBufferStart= m_uProcessCount*samplesToWrite + iWriteCycle*samplesToWrite;
+// 				m_pOutput->write( qToLittleEndian((const char*)&m_fChunkFromFile[0][uBufferStart]), /*m_uNumChannels**/samplesToWrite/**sizeof(float)*/ );
+// 			}
+			
+			m_pOutput->write( qToLittleEndian((const char*)&m_fChunkFromFile[0][uBufferStart]), 100*m_uNumChannels*m_uBufferSize*sizeof(float) );
 		else {
 			m_bStopProcessing= true;
 			return; 
@@ -373,6 +400,21 @@ void Engine::outputAudio() {
 		m_bStopProcessing= true;
 		return;
 	}
+	
+	//////////////////////////////////////////////////////////////////////////
+	// GENERATOR TEST
+	//////////////////////////////////////////////////////////////////////////
+// 	if (m_pAudioOutput && m_pAudioOutput->state() != QAudio::StoppedState) {
+// 		int chunks = m_pAudioOutput->bytesFree()/m_pAudioOutput->periodSize();
+// 		while (chunks) {
+// 			const qint64 len = m_pGenerator->read(m_buffer.data(), m_pAudioOutput->periodSize());
+// 			if (len)
+// 				m_pOutput->write(m_buffer.data(), len);
+// 			if (len != m_pAudioOutput->periodSize())
+// 				break;
+// 			--chunks;
+// 		}
+//  	}
 } // end Engine::outputAudio()
 
 

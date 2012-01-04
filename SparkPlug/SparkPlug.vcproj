@@ -125,7 +125,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="$(PROJDIR)/Sparkplug/Debug/Engine $(PROJDIR)/Sparkplug/Debug/moc_Engine $(PROJDIR)/Sparkplug/Engine/libsndfile-1.lib qtmaind.lib QtCored4.lib QtGuid4.lib QtMultimediad4.lib"
+				AdditionalDependencies="$(PROJDIR)/Sparkplug/Debug/Engine $(PROJDIR)/Sparkplug/Debug/moc_Engine $(PROJDIR)/Sparkplug/Debug/Generator $(PROJDIR)/Sparkplug/Debug/moc_Generator $(PROJDIR)/Sparkplug/Engine/libsndfile-1.lib qtmaind.lib QtCored4.lib QtGuid4.lib QtMultimediad4.lib"
 				OutputFile="$(OutDir)\$(ProjectName).exe"
 				AdditionalLibraryDirectories="$(QTDIR)\lib"
 				GenerateDebugInformation="true"
@@ -158,7 +158,7 @@
 	</References>
 	<Files>
 		<Filter
-			Name="Source Files"
+			Name="SparkPlug"
 			Filter="cpp;cxx;c;def"
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
@@ -175,7 +175,7 @@
 				>
 			</File>
 			<Filter
-				Name="Header Files"
+				Name="SparkPlug Headers"
 				Filter="h"
 				UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 				>

@@ -16,6 +16,8 @@
 #include <vector>
 using namespace std;
 
+class Generator;
+
 class /*ENGINE_EXPORT*/ Engine : public QThread {
 	Q_OBJECT
 public:
@@ -33,7 +35,7 @@ private slots:
 	void slotRunProcessingThread();			//!< Perform DSP thread operations
 
 protected:
-	void run();		//!< Begin processing, called from the UI thread to start processing
+	void run();					//!< Begin processing, called from the UI thread to start processing
 
 private:
 	QAudioDeviceInfo m_pDevice;			//!< Our audio device info
@@ -42,12 +44,15 @@ private:
 	QAudioFormat m_format;				//!< Our audio format struct
 	SndfileHandle* m_pAudioFile;		//!< The piece of audio we're currently looking at
 	
+	Generator* m_pGenerator;			//!< Our Generator instance
+	
 	bool m_bStopProcessing,				//!< Set when we're going to stop processing after next round;
 		 m_bInjectAudioFromFile;		//!< Set when we're injecting audio from some file into the processing stream
 		 
 	uint m_uNumChannels,				//!< Our current number of channels
 		 m_uBufferSize,					//!< Out current buffer size 
-		 m_uSampleRate;
+		 m_uSampleRate,					//!< Our current sample rate
+		 m_uNumSamples;					//!< The number of samples we've read from disk
 		 
 	qint64 m_uLastStartTime,			//!< The time that the last round of processing started
 		   m_uProcessCount;				//!< The number of times we've processed
@@ -55,10 +60,11 @@ private:
 	vector<float> m_fTempChunk;			//!< A temporary 1d vector to hold the chunk of audio
 	
 	vector< vector<float> > m_fTempBuffer,			//!< A temporary buffer to hold audio samples before they're
-						    m_fChunkFromFile;		//!< The chunk of audio we've read from file and are holding in memory
+							m_fChunkFromFile;		//!< The chunk of audio we've read from file and are holding in memory
 
 	QBuffer* m_pAudioBuffer;			//<! The current buffer of audio we're working with
 	
+	QByteArray m_buffer;
 	
 	
 	//! Perform DSP thread operations
