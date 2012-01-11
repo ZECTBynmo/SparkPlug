@@ -27,6 +27,9 @@ public:
 	//! Set a new audio device
 	void SetAudioDevice( const QAudioDeviceInfo& deviceInfo );
 	
+	//! Linearly interpolate float sample to int range
+	int FloatSampleToSignedInt( float fSource, float fRangeFromLow, float fRangeFromHigh, int iRangeToLow, int iRangeToHigh );
+	
 signals:
 	
 private slots:
@@ -56,11 +59,15 @@ private:
 		 
 	qint64 m_uLastStartTime,			//!< The time that the last round of processing started
 		   m_uProcessCount;				//!< The number of times we've processed
+		   
+	float m_fProcessDurationEst;		//!< Our current estimation for the duration of one processing cycle
 		
 	vector<float> m_fTempChunk;			//!< A temporary 1d vector to hold the chunk of audio
 	
 	vector< vector<float> > m_fTempBuffer,			//!< A temporary buffer to hold audio samples before they're
 							m_fChunkFromFile;		//!< The chunk of audio we've read from file and are holding in memory
+							
+	vector<uint> m_uIntSamples;		//!< Our samples to write converted to ints
 
 	QBuffer* m_pAudioBuffer;			//<! The current buffer of audio we're working with
 	
@@ -85,8 +92,13 @@ private:
 	void readChunkOfAudioFromFile();
 	//! Split the temporary buffer into two channels
 	void separateChannels();	
+	//! Join separated channels into one output buffer
+	void joinChannels();
 	//! Create our audio output
 	void createAudioOutput();
+	//! Convert all samples to ints
+	void convertFloatSamplesToInt();		
+
 };
 
 #endif // ENGINE_H

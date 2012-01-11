@@ -20,7 +20,8 @@ namespace {
 	const uint SAMPLE_RATE= 44100,				// Only one sample rate for now
 			   BUFFER_SIZE= 8192,				// Only one buffer size for now
 			   MAX_CHANNELS= 2,					// Just change this to 1 for mono
-			   CHUNK_SIZE= BUFFER_SIZE * 10000;	// The number of samples we read from an audio file at a time
+			   CHUNK_SIZE= BUFFER_SIZE * 10000,	// The number of samples we read from an audio file at a time
+			   SAMPLE_SIZE= 16;
 			 
 }
 
@@ -41,7 +42,7 @@ m_uNumSamples(CHUNK_SIZE) {
 	// Setup our audio format struct
 	m_format.setFrequency( SAMPLE_RATE );
 	m_format.setChannels( m_uNumChannels );
- 	m_format.setSampleSize( 4 );
+ 	m_format.setSampleSize( SAMPLE_SIZE );
  	m_format.setCodec( "pcm" );
 // 	m_format.setByteOrder( QAudioFormat::LittleEndian );
  	m_format.setSampleType( QAudioFormat::Float );
@@ -99,15 +100,17 @@ void Engine::SetAudioDevice( const QAudioDeviceInfo& deviceInfo ) {
 	m_pAudioOutput->stop();
 	m_pAudioOutput->disconnect(this);
 	m_pDevice = deviceInfo;
+	m_format= deviceInfo.preferredFormat();
 	
 	// Set the use of float data
 	m_format.setSampleType( QAudioFormat::Float );
-	m_format.setSampleSize( 4 );
+	m_format.setSampleSize( SAMPLE_SIZE );
 	
 	// Setup our audio device information
-	if ( !m_pDevice.isFormatSupported(deviceInfo.preferredFormat()) ) {
+	while ( !m_pDevice.isFormatSupported( m_format ) ) {
 		m_format = m_pDevice.nearestFormat( deviceInfo.preferredFormat() );
 	}
+	
 	createAudioOutput();
 	
 } // end Engine::setAudioDevice()
@@ -293,7 +296,8 @@ void Engine::runProcessingThread() {
 	// Get a timestamp for the start of this round of processing
 	m_uLastStartTime= QDateTime::currentMSecsSinceEpoch();
 	
-	m_uProcessCount++;
+	// Schedule another round of processing
+	scheduleProcessing();
 	
 	// Clear out the previous buffer of audio
 	clearBuffer();
@@ -309,8 +313,8 @@ void Engine::runProcessingThread() {
 	// Send our processed audio out the sound card
 	outputAudio();
 	
-	// Schedule another round of processing
-	scheduleProcessing();
+	// We've now processed one more time
+	m_uProcessCount++;
 	
 } // end Engine::runProcessingThread()
 
@@ -329,6 +333,10 @@ void Engine::scheduleProcessing() {
 		// Exit the processing round for good (THIS EXITS THE THREAD, BAD!)
 		exit();
 	} else {
+		// If this is the second time we processed, find out a first estimate of the processing latency
+		if( m_uProcessCount == 1 ) {
+		}
+		
 		// Schedule the next round of processing for one second after this round started
 		uint uBufferMS= 1000.0f * ( (float)m_uBufferSize / (float)m_uSampleRate );
 		qint64 iTimerDelay;
@@ -370,28 +378,29 @@ void Engine::injectAudioFromFile() {
 void Engine::outputAudio() {
 	QByteArray tempAudio;
 
-	uint uBufferStart= (m_uProcessCount-1)*m_uBufferSize,
+	uint uBufferStart= (m_uProcessCount)*m_uBufferSize,
 		 uBufferEnd= m_uProcessCount*m_uBufferSize + m_uBufferSize;
 		 
 	// TODO: Get rid of this test stuff
+	//////////////////////////////////////////////////////////////////////////
 	QAudioFormat::Endian byteOrd= m_format.byteOrder();
 	uint uChannels= m_format.channelCount(),
 		 uBytes= m_format.sampleSize(),
-		 uFloatSize= sizeof(float);
+		 uFloatSize= sizeof(int);
+		 
 		 
 	QAudioFormat::SampleType format= m_format.sampleType();
 		 
 	uint samplesToWrite= m_pAudioOutput->periodSize();
-
+	//////////////////////////////////////////////////////////////////////////
+	
+	
+	// Convert float samples to signed integers
+	convertFloatSamplesToInt();
 	
 	if( m_pOutput ) {
 		if( uBufferStart + 2*m_uBufferSize < m_fChunkFromFile[0].size() )
-// 			for( uint iWriteCycle=0; (iWriteCycle+2)*samplesToWrite<m_fChunkFromFile[0].size(); ++iWriteCycle ) {
-// 				uint uBufferStart= m_uProcessCount*samplesToWrite + iWriteCycle*samplesToWrite;
-// 				m_pOutput->write( qToLittleEndian((const char*)&m_fChunkFromFile[0][uBufferStart]), /*m_uNumChannels**/samplesToWrite/**sizeof(float)*/ );
-// 			}
-			
-			m_pOutput->write( qToLittleEndian((const char*)&m_fChunkFromFile[0][uBufferStart]), 100*m_uNumChannels*m_uBufferSize*sizeof(float) );
+			m_pOutput->write( qToLittleEndian((const char*)&m_uIntSamples[0]), m_uIntSamples.size()*sizeof(int) );
 		else {
 			m_bStopProcessing= true;
 			return; 
@@ -401,21 +410,40 @@ void Engine::outputAudio() {
 		return;
 	}
 	
-	//////////////////////////////////////////////////////////////////////////
-	// GENERATOR TEST
-	//////////////////////////////////////////////////////////////////////////
-// 	if (m_pAudioOutput && m_pAudioOutput->state() != QAudio::StoppedState) {
-// 		int chunks = m_pAudioOutput->bytesFree()/m_pAudioOutput->periodSize();
-// 		while (chunks) {
-// 			const qint64 len = m_pGenerator->read(m_buffer.data(), m_pAudioOutput->periodSize());
-// 			if (len)
-// 				m_pOutput->write(m_buffer.data(), len);
-// 			if (len != m_pAudioOutput->periodSize())
-// 				break;
-// 			--chunks;
-// 		}
-//  	}
 } // end Engine::outputAudio()
+
+
+//////////////////////////////////////////////////////////////////////////////
+/*! Linearly interpolate float sample to int range */
+int Engine::FloatSampleToSignedInt( float fSource, float fRangeFromLow, float fRangeFromHigh, int iRangeToLow, int iRangeToHigh ) {
+	
+	float fSourceRange= fRangeFromHigh - fRangeFromLow,
+		  fSourceRatio= ( fSource - fRangeFromLow ) / fSourceRange,
+		  fTargetRange= iRangeToHigh - iRangeToLow,
+		  fTargetValue= fTargetRange * fSourceRatio + iRangeToLow;
+	
+	return int( fTargetValue );
+	
+} // end Engine::FloatSampleToSignedInt()
+
+
+//////////////////////////////////////////////////////////////////////////////
+/*! Convert all samples to ints */
+void Engine::convertFloatSamplesToInt() {
+	m_uIntSamples.clear();
+	
+	for( uint iSample=0; iSample<m_uBufferSize; ++iSample ) {
+		uint uIndex= m_uBufferSize*m_uProcessCount + iSample;
+		m_uIntSamples.push_back( FloatSampleToSignedInt(m_fChunkFromFile[0][uIndex], -1.0f, 1.0f, -32768, 32767) ); 
+	}
+} // end Engine::convertFloatSamplesToInt()
+
+
+//////////////////////////////////////////////////////////////////////////////
+/*! Join separated channels into one output buffer */
+void Engine::joinChannels() {
+	
+} // end Engine::joinChannels()
 
 
 //////////////////////////////////////////////////////////////////////////////
